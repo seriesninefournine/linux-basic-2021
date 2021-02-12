@@ -1,2 +1,98 @@
 #!/bin/bash
-echo test
+
+function SELinuxStatusCheck {
+    echo "Статус службы selinux:"
+	
+	#Проверяем статус службы
+	if sestatus | grep -i "selinux status" | grep enabled > /dev/null; then
+		echo -e "Служба SELinux \033[1;32mвключена\033[0m"
+		SelStat=1
+		
+		#Проверяем режим Enforcing
+		if [ $(getenforce) == "Enforcing" ]; then 
+			echo -e "Служба SELinux работает в \033[1;32mактивном\033[0m режиме"
+			SelEnforce=1
+		else
+			echo -e "Служба SELinux работает в \033[1;33mпассивном\033[0m режиме"
+			SelEnforce=0
+		fi
+		
+	else
+		echo -e "Служба SELinux \033[1;31mотключена\033[0m"
+		SelStat=0
+	fi
+	
+	#Проверяем статус в конфигурации
+	case $(grep SELINUX= /etc/selinux/config | grep -v ^#) in
+		"SELINUX=enforcing" )
+			echo -e "Служба SELinux будет запускаться в \033[1;32mактивном\033[0m режиме"
+			SelConf="enforcing"
+			;;
+		"SELINUX=permissive" )
+			echo -e "Служба SELinux будет запускаться в \033[1;33mпассивном\033[0m режиме"
+			SelConf="permissive"
+			;;
+		"SELINUX=disabled" )
+			echo -e "Служба SELinux \033[1;31mотключена\033[0m в конфигурации"
+			SelConf="disabled"
+			;;
+	esac
+}	
+
+function RootStatusCheck {
+	#Проверяем права пользователя
+	if [ $(whoami) != root ]; then
+		echo "Для изменнеия статуса службы SELinux необходимо повышение прав"
+		echo -e "Выполните\033[1m sudo $0 \033[0m"
+		exit 0
+	fi
+}
+
+function SELinuxChangeStartup {
+	#Устанавливаем режим запуска службы SELinux
+	echo "Установить активный режим при загрузке системы: 1"
+	echo "Установить пассивный режим при загрузке системы: 2"
+	echo "Отключить службу SELinux: 3"
+	echo "В предыдущее меню: 4"
+	read Key
+	case $Key in
+		1 ) 
+			sed -i -e "s/SELINUX=$SelConf/SELINUX=enforcing/g" /etc/selinux/config > /dev/null
+			SELinuxStatusCheck
+			;;
+		2 )
+			sed -i -e "s/SELINUX=$SelConf/SELINUX=permissive/g" /etc/selinux/config > /dev/null
+			SELinuxStatusCheck
+			;;
+		3 )
+			sed -i -e "s/SELINUX=$SelConf/SELINUX=disabled/g" /etc/selinux/config > /dev/null
+			SELinuxStatusCheck
+			;;
+		* )
+			SELinuxChangeStat
+			;;
+	esac
+}
+
+function SELinuxChangeStat {
+	echo -e "\n"
+	echo "Изменить режим запуска службы: 1"
+	if [ $SelStat -eq 1 ]; then
+		echo -e "Изменить режим работы службы: 2"
+	fi
+	echo "Выход: 0"
+	read Key
+	case "$Key" in
+		1 ) 
+			SELinuxChangeStartup
+			;;
+		2 )
+			if [ $SelEnforce -eq 1 ]; then setenforce 0; else setenforce 1; fi;
+			SELinuxStatusCheck
+			;;
+	esac
+}
+
+SELinuxStatusCheck
+RootStatusCheck
+SELinuxChangeStat
