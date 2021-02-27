@@ -34,6 +34,6 @@ sed -i '/^[[:blank:]]*location \x2F \x7B/a proxy_pass http\x3A\x2F\x2Fhttpd-test
 systemctl start httpd nginx
 
 #Проверяем работу нод апача
-curl localhost | grep work
-curl localhost | grep work
-curl localhost | grep work
+curl -s localhost | grep work
+curl -s localhost | grep work
+curl -s localhost | grep work
