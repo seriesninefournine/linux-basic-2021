@@ -30,5 +30,10 @@ echo -e '<!DOCTYPE HTML><html><head><title>Apache node03</title></head><body><H1
 echo -e 'upstream httpd-test {\nserver localhost:8081;\nserver localhost:8082;\nserver localhost:8083;\n}' > /etc/nginx/conf.d/upstream.conf
 sed -i '/location \x2F \x7B/a proxy_pass http\x3A\x2F\x2Fhttpd-test\x2F\x3B' /etc/nginx/nginx.conf
 
+#запускаем службы апача и нджинкса
+systemctl start httpd nginx
+
 #Проверяем работу нод апача
+curl localhost | grep work
+curl localhost | grep work
 curl localhost | grep work
