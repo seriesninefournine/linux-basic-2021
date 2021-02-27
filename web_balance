@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#Отключаем selinux
+setenforce 0
+
 #устанавливаем все службы
 yum install epel-release -y
 yum install httpd nginx -y
