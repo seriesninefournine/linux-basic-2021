@@ -13,10 +13,10 @@ systemctl enable mysqld
 systemctl start mysqld
 
 #Вытаскиваем временный пароль от MySQL
-MYSQL_TMP_PASS=$(grep 'temporary password' /var/log/mysqld.log | grep -oE '[^ ]+$')
+$MYSQL_TMP_PASS=$(grep 'temporary password' /var/log/mysqld.log | grep -oE '[^ ]+$')
 MYSQL_PASS='Qq123456!'
 
-MYSQL_SEC_INSTALL=$(expect -c "
+/usr/bin/expect<<FILETRANSFER
 set timeout -1
 spawn mysql_secure_installation
 match_max 100000
@@ -67,7 +67,7 @@ expect -exact \"y\r
 
 Reload privilege tables now? (Press y|Y for Yes, any other key for No) : \"
 send -- \"y\r\"
-expect eof
-")
+interact
+FILETRANSFER
 
 echo "$MYSQL_SEC_INSTALL"
