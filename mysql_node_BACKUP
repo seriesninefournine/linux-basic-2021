@@ -1,0 +1,22 @@
+#!/bin/bash
+#Настройка BACKUP сервера
+#Т.к. снимаю резевные копии на сервере, где уже работает СУБД, то первоначальную настройку MySQL не описываю
+#В моем случае MASTER сервер делает бэкап со SLAVE
+
+#Отключаем то, что может нам мешать
+setenforce 0
+systemctl stop firewalld
+
+#Устанавливаем переменные
+#MYSQL_PASS - Пароль от root
+#SRV_IP - IP адрес сервера MySQL
+MYSQL_PASS='Qq123456!'
+SRV_IP='192.168.10.23';
+
+
+#Получаем информацию о бинлогах
+BinFile=$(mysql -u 'root' -h $SRV_IP -p$MYSQL_PASS -e "SHOW MASTER STATUS\G;" | grep File | grep -oE '[^ ]+$')
+#BinPos=$(mysql -u 'usr_slave' -h $MASTER_SRV_IP -p$MYSQL_PASS -e "SHOW MASTER STATUS\G;" | grep Position | grep -oE '[^ ]+$')
+
+mysqldump --host=$SRV_IP --password=$MYSQL_PASS --user='root' --all-databases --events --routines --master-data=2 --dump-slave > dump_file
+mysqlbinlog --read-from-remote-server --host=$SRV_IP --password=$MYSQL_PASS --user='root' --raw $BinFile
