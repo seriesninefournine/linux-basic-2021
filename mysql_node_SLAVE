@@ -9,9 +9,11 @@ systemctl stop firewalld
 #MYSQL_PASS - новый пароль от MySQL
 #MASTER_SRV_IP - IP адрес MASTER сервера
 #SLAVE_SRV_IP - IP адрес SLAVE сервера
+#BACK_SRV_IP - IP адрес сервера, который снимает бэкапы
 MYSQL_PASS='Qq123456!'
 MASTER_SRV_IP='192.168.10.22';
 SLAVE_SRV_IP='192.168.10.23';
+BACK_SRV_IP='192.168.10.22';
 
 #Устанавливаем mysql
 curl -O https://repo.mysql.com//mysql80-community-release-el7-3.noarch.rpm
@@ -19,13 +21,14 @@ rpm -Uvh mysql80-community-release-el7-3.noarch.rpm
 rm mysql80-community-release-el7-3.noarch.rpm -f
 yum install mysql-server expect -y
 echo 'server_id = 2' >> /etc/my.cnf
+echo 'bind-address            = 0.0.0.0' >> /etc/my.cnf
 systemctl enable mysqld
 systemctl start mysqld
 
 #Вытаскиваем временный пароль от MySQL
 MYSQL_TMP_PASS=$(grep 'temporary password' /var/log/mysqld.log | grep -oE '[^ ]+$')
 
-echo $MYSQL_TMP_PASS
+#echo $MYSQL_TMP_PASS
 
 #Автомтизируем mysql_secure_installation
 /usr/bin/expect<<EXP_SCRIPT
@@ -53,5 +56,19 @@ expect eof
 
 EXP_SCRIPT
 
+#Получаем информацию о бинлогах
+#BinFile=$(mysql -u 'usr_slave' -h $MASTER_SRV_IP -p$MYSQL_PASS -e "SHOW MASTER STATUS\G;" | grep File | grep -oE '[^ ]+$')
+#BinPos=$(mysql -u 'usr_slave' -h $MASTER_SRV_IP -p$MYSQL_PASS -e "SHOW MASTER STATUS\G;" | grep Position | grep -oE '[^ ]+$')
 
-mysql -u 'usr_slave' -h $MASTER_SRV_IP -p$MYSQL_PASS -e "SHOW MASTER STATUS\G;" | grep File | grep -oE '[^ ]+$'
+#Подключаемся к MASTER серверу
+mysql -u 'root' -p$MYSQL_PASS -e "SET GLOBAL gtid_mode = OFF_PERMISSIVE; SET GLOBAL gtid_mode = ON_PERMISSIVE; SET GLOBAL ENFORCE_GTID_CONSISTENCY = ON; SET GLOBAL gtid_mode = ON;"
+#mysql -u 'root' -p$MYSQL_PASS -e "CHANGE MASTER TO MASTER_HOST='$MASTER_SRV_IP', MASTER_USER='usr_slave', MASTER_PASSWORD='$MYSQL_PASS', MASTER_LOG_FILE='$BinFile', MASTER_LOG_POS=$BinPos, GET_MASTER_PUBLIC_KEY = 1;"
+mysql -u 'root' -p$MYSQL_PASS -e "CHANGE MASTER TO MASTER_HOST='$MASTER_SRV_IP', MASTER_USER='usr_slave', MASTER_PASSWORD='$MYSQL_PASS', GET_MASTER_PUBLIC_KEY = 1, MASTER_AUTO_POSITION=1;"
+mysql -u 'root' -p$MYSQL_PASS -e "START SLAVE;"
+
+#Создаем пользователя для снятия резервной копии
+mysql -u 'root' -p$MYSQL_PASS -e "create user root@$BACK_SRV_IP IDENTIFIED WITH caching_sha2_password BY '$MYSQL_PASS'; GRANT ALL ON *.* TO root@$BACK_SRV_IP; flush privileges;"
+
+
+#Переводим SLAVE в режим read_only
+mysql -u 'root' -p$MYSQL_PASS -e "set global innodb_read_only = ON;"
