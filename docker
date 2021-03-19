@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#Указываем адрес, где размещен апача
+HOST_IP=192.168.10.22
+
 #Отключаем то, что может нам мешать
 setenforce 0
 systemctl stop firewalld
@@ -8,7 +11,7 @@ systemctl stop firewalld
 yum install yum-utils -y
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 yum install docker-ce docker-ce-cli containerd.io httpd -y
-systemctl enable docker
+systemctl enable docker httpd
 systemctl start docker
 
 #Настраиваем файл /etc/httpd/conf/httpd.conf
@@ -26,5 +29,39 @@ echo -e '<!DOCTYPE HTML><html><head><title>Apache node02</title></head><body><H1
 echo -e '<VirtualHost *:8083> \n ServerAdmin web@master.local \n DocumentRoot /var/www/node03 \n</VirtualHost>' > /etc/httpd/conf.d/node03.conf
 echo -e '<!DOCTYPE HTML><html><head><title>Apache node03</title></head><body><H1>\nApache node03 work!!!\n</H1></body></html>' > /var/www/node03/index.html
 
+#Запускаем httpd
+systemctl start httpd
+
+#Формируем файл конфигурации нджинкса
+echo "server {
+    listen       80;
+    listen  [::]:80;
+    server_name  localhost;
+
+
+    location / {
+        proxy_pass http://httpd-test/;
+    }
+
+    #error_page  404              /404.html;
+
+    # redirect server error pages to the static page /50x.html
+    #
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+
+}" > ./default.conf
+
+
+#Конфигурируем файл балансировки и прописываем в конфиг нджинкса
+echo -e "upstream httpd-test {\nserver $HOST_IP:8081;\nserver $HOST_IP:8082;\nserver $HOST_IP:8083;\n}" > ./upstream.conf
+
+#Собираем образ нджинкса с конфигом upstream.conf
+echo "FROM nginx:latest
+COPY ./upstream.conf /etc/nginx/conf.d/upstream.conf" > Dockerfile
+docker build -t mynginx .
+
 #Запускаем nginx
-docker run -it -d -p 80:80 --name web nginx
+docker run -it -d -p 80:80 --name mynginx -v $(pwd)/default.conf:/etc/nginx/conf.d/default.conf mynginx
