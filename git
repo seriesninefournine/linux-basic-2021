@@ -1,0 +1,14 @@
+#!/bin/bash
+yum install git -y
+ssh-keygen -P "" -f /root/.ssh/id_rsa
+echo "Необходимо добавть публичный ключ из вывода ниже на github.com по пути [settings - SSH and GPG keys - new SSH key]"
+cat /root/.ssh/id_rsa.pub
+
+read -p "Нажмите любую кнопку для продолжения скрипта"
+
+mkdir testrepo
+cd ./testrepo
+git remote add origin git@github.com:seriesninefournine/otus_testrepo.git
+git branch -M main
+git push -u origin main
+cat very-super-puper-important-file.cfg
