@@ -8,7 +8,6 @@ read -p "Нажмите любую кнопку для продолжения с
 
 mkdir testrepo
 cd ./testrepo
-git remote add origin git@github.com:seriesninefournine/otus_testrepo.git
-git branch -M main
-git push -u origin main
+git clone git@github.com:seriesninefournine/otus_testrepo.git
+cd ./otus_testrepo/
 cat very-super-puper-important-file.cfg
