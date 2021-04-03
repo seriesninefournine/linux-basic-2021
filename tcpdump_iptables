@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#Отключаем то, что может нам мешать
+setenforce 0
+systemctl stop firewalld
+systemctl disable firewalld
+
+#Устанавливаем ПО
+yum install iptables-services tcpdump -y
+
+#включаем службу iptables
+systemctl enable iptables
+systemctl start iptables
+
+#Снимаем дамп обращения к веб серверу
+tcpdump -pnni enp0s3 "port 80" > dump_port80.txt &
+
+curl y0.ru > /dev/null && sleep 5 && kill $(ps -C tcpdump)
+
+#Показываем дамп
+echo "-----------dump port 80-----------"
+cat dump_port80.txt
+
+#Очищаем iptables
+iptables -F
+
+#блокируем подключение в 80 порту
+iptables -A OUTPUT -p tcp --destination-port 80 -j DROP
+
+#Сохраняем
+service iptables save
+
+#Проверяем
+echo "-----------ICMP работает-----------" > iptables_test.txt
+ping -c 5 y0.ru >> iptables_test.txt
+echo "---------HTTP не работает----------" >> iptables_test.txt
+curl --connect-timeout 5 y0.ru >> iptables_test.txt
+
+cat iptables_test.txt
