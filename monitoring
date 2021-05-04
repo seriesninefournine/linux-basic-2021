@@ -5,7 +5,8 @@ setenforce 0
 systemctl stop firewalld
 
 #Устанавливаем нажное ПО
-yum install wget -y
+yum install wget ntp ntpdate -y
+systemctl start ntpd
 
 #добавляем служебных пользователей для службы мониторинга
 useradd -M -s /usr/sbin/nologin prometheus
