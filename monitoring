@@ -18,8 +18,8 @@ chown prometheus:prometheus /etc/prometheus /var/lib/prometheus
 #Устанавливаем prometheus и node exporter
 mkdir prometheus
 cd ./prometheus
-wget https://github.com/prometheus/prometheus/releases/download/v2.26.0/prometheus-2.26.0.linux-amd64.tar.gz
-wget https://github.com/prometheus/node_exporter/releases/download/v1.1.2/node_exporter-1.1.2.linux-amd64.tar.gz
+wget --no-check-certificate https://github.com/prometheus/prometheus/releases/download/v2.26.0/prometheus-2.26.0.linux-amd64.tar.gz
+wget --no-check-certificate https://github.com/prometheus/node_exporter/releases/download/v1.1.2/node_exporter-1.1.2.linux-amd64.tar.gz
 tar -xzf prometheus-2.26.0.linux-amd64.tar.gz
 tar -xzf node_exporter-1.1.2.linux-amd64.tar.gz
 
