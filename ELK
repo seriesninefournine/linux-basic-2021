@@ -1,0 +1,35 @@
+#!/bin/bash
+
+#Отключаем то, что может нам мешать
+setenforce 0
+systemctl stop firewalld
+
+#Устанавливаем нужное ПО
+yum install ntp ntpdate -y
+systemctl start ntpd -q
+ntpdate -s ntp.ubuntu.com
+sleep 15
+
+rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+echo "[elasticsearch]
+name=Elasticsearch repository for 7.x packages
+baseurl=https://artifacts.elastic.co/packages/7.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=0
+autorefresh=1
+type=rpm-md" > /etc/yum.repos.d/elasticsearch.repo
+
+echo "[kibana-7.x]
+name=Kibana repository for 7.x packages
+baseurl=https://artifacts.elastic.co/packages/7.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md" > /etc/yum.repos.d/elasticsearch.repo
+
+yum install --enablerepo=elasticsearch elasticsearch kibana -y
+systemctl daemon-reload
+systemctl enable elasticsearch kibana
+systemctl start elasticsearch kibana
