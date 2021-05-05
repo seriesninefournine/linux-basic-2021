@@ -27,7 +27,7 @@ gpgcheck=1
 gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
 enabled=1
 autorefresh=1
-type=rpm-md" > /etc/yum.repos.d/elasticsearch.repo
+type=rpm-md" > /etc/yum.repos.d/kibana.repo
 
 yum install --enablerepo=elasticsearch elasticsearch kibana -y
 systemctl daemon-reload
