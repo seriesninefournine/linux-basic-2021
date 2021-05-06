@@ -5,8 +5,10 @@ setenforce 0
 systemctl stop firewalld
 
 #Устанавливаем нужное ПО
-yum install ntp ntpdate -y
-systemctl start ntpd -q
+yum install epel-release -y
+yum install ntp ntpdate httpd -y
+systemctl enable ntpd httpd
+systemctl start ntpd httpd
 ntpdate -s ntp.ubuntu.com
 sleep 15
 
@@ -29,7 +31,68 @@ enabled=1
 autorefresh=1
 type=rpm-md" > /etc/yum.repos.d/kibana.repo
 
-yum install --enablerepo=elasticsearch elasticsearch kibana -y
+yum install elasticsearch kibana logstash filebeat -y
+/usr/share/logstash/bin/system-install /etc/logstash/startup.options systemd
 systemctl daemon-reload
-systemctl enable elasticsearch kibana
-systemctl start elasticsearch kibana
+systemctl enable elasticsearch kibana 
+systemctl start elasticsearch 
+echo 'server.host: "192.168.10.22"' >> /etc/kibana/kibana.yml
+systemctl start kibana
+
+echo 'input {
+  beats {
+    port => 5044
+  }
+}' > /etc/logstash/conf.d/input.conf
+
+echo 'output {
+elasticsearch {
+hosts => [ "localhost:9200" ]
+        manage_template => false
+        index => "nginx-%{+YYYY.MM.dd}"
+    }
+}' > /etc/logstash/conf.d/output.conf
+
+echo 'filter {
+ if [event][dataset] == "nginx.access" {
+   grok {
+    match => [ "message" , "%{IPORHOST:clientip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:timestamp}\] \"(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:httpversion})?|%{DATA:rawrequest})\" %{NUMBER:response} (?:%{NUMBER:bytes}|-) %{QS:referrer} %{QS:user_agent}"]
+    overwrite => [ "message" ]
+   }
+   mutate {
+    convert => ["response", "integer"]
+    convert => ["bytes", "integer"]
+    convert => ["responsetime", "float"]
+   }
+  date {
+   match => [ "timestamp" , "dd/MMM/YYYY:HH:mm:ss Z" ]
+   remove_field => [ "timestamp" ]
+  }
+  
+  useragent {
+   source => "user_agent"
+  }
+ }
+}' > /etc/logstash/conf.d/filter.conf
+
+systemctl start logstash
+
+mv /etc/filebeat/modules.d/nginx.yml.disabled /etc/filebeat/modules.d/nginx.yml
+
+echo '
+- module: nginx
+  access:
+    enabled: true
+    var.paths: ["/path/to/log/nginx/access.log*"]
+  error:
+    enabled: true
+    var.paths: ["/var/log/httpd/error_log*"]
+' > /etc/filebeat/modules.d/nginx.yml
+
+sed -i '176 s/.*/#output.elasticsearch:/' /etc/filebeat/filebeat.yml
+sed -i '178 s/.*/  #hosts: ["localhost:9200"]/' /etc/filebeat/filebeat.yml
+sed -i '189 s/.*/output.logstash:/' /etc/filebeat/filebeat.yml
+sed -i '191 s/.*/  hosts: ["localhost:5044"]/' /etc/filebeat/filebeat.yml
+
+systemctl enable filebeat
+systemctl start filebeat
