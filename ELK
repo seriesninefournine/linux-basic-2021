@@ -36,7 +36,7 @@ yum install elasticsearch kibana logstash filebeat -y
 systemctl daemon-reload
 systemctl enable elasticsearch kibana 
 systemctl start elasticsearch 
-echo 'server.host: "192.168.10.22"' >> /etc/kibana/kibana.yml
+echo 'server.host: "0.0.0.0"' >> /etc/kibana/kibana.yml
 systemctl start kibana
 
 echo 'input {
@@ -54,25 +54,43 @@ hosts => [ "localhost:9200" ]
 }' > /etc/logstash/conf.d/output.conf
 
 echo 'filter {
- if [event][dataset] == "nginx.access" {
-   grok {
-    match => [ "message" , "%{IPORHOST:clientip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:timestamp}\] \"(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:httpversion})?|%{DATA:rawrequest})\" %{NUMBER:response} (?:%{NUMBER:bytes}|-) %{QS:referrer} %{QS:user_agent}"]
-    overwrite => [ "message" ]
-   }
-   mutate {
-    convert => ["response", "integer"]
-    convert => ["bytes", "integer"]
-    convert => ["responsetime", "float"]
-   }
-  date {
-   match => [ "timestamp" , "dd/MMM/YYYY:HH:mm:ss Z" ]
-   remove_field => [ "timestamp" ]
+  if [fileset][module] == "nginx" {
+    if [fileset][name] == "access" {
+      grok {
+        match => { "message" => ["%{IPORHOST:[nginx][access][remote_ip]} - %{DATA:[nginx][access][user_name]} \[%{HTTPDATE:[nginx][access][time]}\] \"%{WORD:[nginx][access][method]} %{DATA:[nginx][access][url]} HTTP/%{NUMBER:[nginx][access][http_version]}\" %{NUMBER:[nginx][access][response_code]} %{NUMBER:[nginx][access][body_sent][bytes]} \"%{DATA:[nginx][access][referrer]}\" \"%{DATA:[nginx][access][agent]}\""] }
+        remove_field => "message"
+      }
+      mutate {
+        add_field => { "read_timestamp" => "%{@timestamp}" }
+      }
+      date {
+        match => [ "[nginx][access][time]", "dd/MMM/YYYY:H:m:s Z" ]
+        remove_field => "[nginx][access][time]"
+      }
+      useragent {
+        source => "[nginx][access][agent]"
+        target => "[nginx][access][user_agent]"
+        remove_field => "[nginx][access][agent]"
+      }
+      geoip {
+        source => "[nginx][access][remote_ip]"
+        target => "[nginx][access][geoip]"
+      }
+    }
+    else if [fileset][name] == "error" {
+      grok {
+        match => { "message" => ["%{DATA:[nginx][error][time]} \[%{DATA:[nginx][error][level]}\] %{NUMBER:[nginx][error][pid]}#%{NUMBER:[nginx][error][tid]}: (\*%{NUMBER:[nginx][error][connection_id]} )?%{GREEDYDATA:[nginx][error][message]}"] }
+        remove_field => "message"
+      }
+      mutate {
+        rename => { "@timestamp" => "read_timestamp" }
+      }
+      date {
+        match => [ "[nginx][error][time]", "YYYY/MM/dd H:m:s" ]
+        remove_field => "[nginx][error][time]"
+      }
+    }
   }
-  
-  useragent {
-   source => "user_agent"
-  }
- }
 }' > /etc/logstash/conf.d/filter.conf
 
 systemctl start logstash
